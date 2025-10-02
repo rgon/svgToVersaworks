@@ -1,0 +1,35 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: Test Case
+%%CreationDate: Test
+%%Pages: 1
+%%BoundingBox: 0 0 100 100
+%%EndComments
+%%BeginProlog
+50 dict begin
+/S { stroke } bind def
+/m { moveto } bind def
+/l { lineto } bind def
+/setrgbcolor { setrgbcolor } bind def
+/setcmykcolor { setcmykcolor } bind def
+/setgray { setgray } bind def
+%%EndProlog
+%%BeginSetup
+%%EndSetup
+%%Page: 1 1
+%%BeginPageSetup
+%%EndPageSetup
+
+% Test RGB color
+1 0 0 setrgbcolor
+10 10 m 90 10 l S
+
+% Test CMYK color  
+0 1 0 0 setcmykcolor
+10 30 m 90 30 l S
+
+% Test grayscale
+0.5 setgray
+10 50 m 90 50 l S
+
+showpage
+%%EOF

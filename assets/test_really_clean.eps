@@ -1,0 +1,55 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: Test Case
+%%CreationDate: Test
+%%Pages: 1
+%%BoundingBox: 0 0 100 100
+%%EndComments
+%%DocumentCustomColors: (CutContour)
+%%CMYKCustomColor: 0 1.0 0 0 (CutContour)
+%%BeginProlog
+
+% CutContour spot color for Roland Versaworks
+% Simple implementation matching CorelDRAW output
+
+% Define CMYK color space
+/DocCmykSpace [/DeviceCMYK] def
+
+% Simple spot color creator
+/create_spot_color {
+  % Expected stack: /ColorSpace [ColorValues] (SpotName) Tint
+  4 1 roll pop pop pop
+  % For now, just use the equivalent CMYK color
+  0 1.0 0 0 setcmykcolor
+} bind def
+
+% Stub for set_outline
+/set_outline { pop } bind def
+
+50 dict begin
+/S { stroke } bind def
+/m { moveto } bind def
+/l { lineto } bind def
+/setrgbcolor { setrgbcolor } bind def
+/setcmykcolor { setcmykcolor } bind def
+/setgray { setgray } bind def
+%%EndProlog
+%%BeginSetup
+%%EndSetup
+%%Page: 1 1
+%%BeginPageSetup
+%%EndPageSetup
+
+% Test RGB color
+1 0 0 setrgbcolor
+10 10 m 90 10 l 0.25 setlinewidth S
+
+% Test CMYK color  
+0 1 0 0 setcmykcolor
+10 30 m 90 30 l 0.25 setlinewidth S
+
+% Test grayscale
+0.5 setgray
+10 50 m 90 50 l 0.25 setlinewidth S
+
+showpage
+%%EOF
