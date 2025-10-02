@@ -15,7 +15,105 @@ Usage:
 import sys
 import re
 import argparse
+import subprocess
+import platform
 from pathlib import Path
+
+
+# Inkscape executable path based on OS
+def get_inkscape_path():
+    """Get the appropriate Inkscape executable path for the current OS."""
+    system = platform.system().lower()
+    
+    if system == 'windows':
+        # Common Windows paths for Inkscape
+        possible_paths = [
+            r'C:\Program Files\Inkscape\bin\inkscape.exe',
+            r'C:\Program Files (x86)\Inkscape\bin\inkscape.exe',
+            'inkscape.exe'  # If in PATH
+        ]
+    elif system == 'darwin':  # macOS
+        possible_paths = [
+            '/Applications/Inkscape.app/Contents/MacOS/inkscape',
+            '/usr/local/bin/inkscape',
+            'inkscape'  # If in PATH
+        ]
+    else:  # Linux and other Unix-like systems
+        possible_paths = [
+            '/usr/bin/inkscape',
+            '/usr/local/bin/inkscape', 
+            'inkscape'  # If in PATH
+        ]
+    
+    # Check which path exists and is executable
+    for path in possible_paths:
+        try:
+            # Try to run inkscape --version to verify it works
+            result = subprocess.run([path, '--version'], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=10)
+            if result.returncode == 0:
+                return path
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            continue
+    
+    # Fallback to 'inkscape' in PATH
+    return 'inkscape'
+
+
+INKSCAPE_PATH = get_inkscape_path()
+
+
+def is_svg_file(file_path):
+    """Check if a file is an SVG file by examining its content."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # Read first few lines to check for SVG markers
+            content = f.read(1024)
+            return '<svg' in content.lower() or content.strip().startswith('<?xml')
+    except (UnicodeDecodeError, OSError):
+        # Try with different encoding or check by extension
+        return str(file_path).lower().endswith('.svg')
+
+
+def convert_svg_to_eps(svg_path, eps_path):
+    """Convert SVG to EPS using Inkscape command line."""
+    cmd = [
+        INKSCAPE_PATH,
+        str(svg_path),
+        '-o', str(eps_path),
+        '--export-text-to-path',
+        '--export-ps-level=3'
+    ]
+    
+    try:
+        print("Converting SVG to EPS using Inkscape...")
+        print(f"Command: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode != 0:
+            print("Error: Inkscape conversion failed", file=sys.stderr)
+            print(f"stderr: {result.stderr}", file=sys.stderr)
+            return False
+        
+        if result.stderr:
+            print(f"Inkscape warnings: {result.stderr}", file=sys.stderr)
+        
+        print(f"Successfully converted SVG to EPS: {eps_path}")
+        return True
+        
+    except subprocess.TimeoutExpired:
+        print("Error: Inkscape conversion timed out", file=sys.stderr)
+        return False
+    except FileNotFoundError:
+        print(f"Error: Inkscape not found at: {INKSCAPE_PATH}", file=sys.stderr)
+        print("Please ensure Inkscape is installed and accessible", file=sys.stderr)
+        return False
+    except Exception as e:
+        print(f"Error during SVG conversion: {e}", file=sys.stderr)
+        return False
 
 
 class EPSToVersaworksConverter:
@@ -29,13 +127,27 @@ class EPSToVersaworksConverter:
     
     def __init__(self, input_file, output_file=None, stroke_width=None):
         """Initialize converter with input/output files."""
+        self.original_input_file = Path(input_file)
         self.input_file = Path(input_file)
+        self.is_svg_input = False
+        self.intermediate_eps = None
+        
+        # Check if input is SVG and handle accordingly
+        if is_svg_file(self.input_file):
+            self.is_svg_input = True
+            # Create intermediate EPS filename
+            self.intermediate_eps = self.input_file.parent / f"{self.input_file.stem}.intermediate.eps"
+            self.input_file = self.intermediate_eps
+            print(f"Detected SVG input: {self.original_input_file}")
         
         if output_file:
             self.output_file = Path(output_file)
         else:
-            stem = self.input_file.stem
-            suffix = self.input_file.suffix
+            stem = self.original_input_file.stem
+            if self.is_svg_input:
+                suffix = '.eps'
+            else:
+                suffix = self.input_file.suffix
             self.output_file = self.input_file.parent / f"{stem}_versaworks{suffix}"
         
         self.stroke_width = stroke_width if stroke_width else self.HAIRLINE_WIDTH
@@ -246,10 +358,15 @@ class EPSToVersaworksConverter:
         Returns:
             bool: True if successful
         """
-        print(f"Converting: {self.input_file}")
+        print(f"Converting: {self.original_input_file}")
         print(f"Output: {self.output_file}")
         
-        # Read input
+        # Handle SVG input conversion first
+        if self.is_svg_input:
+            if not convert_svg_to_eps(self.original_input_file, self.intermediate_eps):
+                return False
+        
+        # Read input (now guaranteed to be EPS)
         content = self.read_file()
         
         # Validate EPS file
@@ -281,25 +398,36 @@ class EPSToVersaworksConverter:
         print(f"The output file uses CutContour spot color ({self.CUTCONTOUR_CMYK[1]}% Magenta)")
         print(f"with hairline stroke width ({self.stroke_width} pt)")
         
+        # Clean up intermediate EPS file if it was created from SVG
+        if self.is_svg_input and self.intermediate_eps and self.intermediate_eps.exists():
+            try:
+                self.intermediate_eps.unlink()
+                print(f"Cleaned up intermediate file: {self.intermediate_eps}")
+            except Exception as e:
+                print(f"Warning: Could not remove intermediate file {self.intermediate_eps}: {e}", file=sys.stderr)
+        
         return True
 
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description='Convert Inkscape EPS to Versaworks-compatible format with CutContour spot color',
+        description='Convert SVG or EPS files to Versaworks-compatible format with CutContour spot color',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   %(prog)s input.eps
+  %(prog)s input.svg
   %(prog)s input.eps -o output_cutcontour.eps
+  %(prog)s input.svg -o cutlines.eps
   %(prog)s input.eps --stroke-width 0.5
 
+SVG files are automatically detected and converted to EPS using Inkscape.
 The CutContour spot color (100%% Magenta) will be applied to all strokes.
 """
     )
     
-    parser.add_argument('input', help='Input EPS file from Inkscape')
+    parser.add_argument('input', help='Input SVG or EPS file (SVG files converted automatically using Inkscape)')
     parser.add_argument('-o', '--output', help='Output EPS file (default: input_versaworks.eps)')
     parser.add_argument('-w', '--stroke-width', type=float, 
                         help='Stroke width in points (default: 0.25)')
