@@ -6,7 +6,7 @@ Useful for using a Roland plotter to create engineering prototypes (like FreeCAD
 
 ## Quick Usage
 Name layers with 'cut' in the name
-![Example in inkscape](doc/inkscape_layers.svg)
+![Example in inkscape](doc/inkscape_layers.png)
 
 Then run the script:
 ```bash
