@@ -2,6 +2,8 @@
 
 This program converts SVG or EPS files to Roland Versaworks-compatible format with proper CutContour spot color support. It separates cut paths from print content when processing SVG files with designated cut layers.
 
+Useful for using a Roland plotter to create engineering prototypes (like FreeCAD sketch/Sheet Metal Workbench exports) as well as custom decals. All with FOSS, no Illustrator nor CorelDRAW needed.
+
 ## Quick Usage
 Name layers with 'cut' in the name
 ![Example in inkscape](doc/inkscape_layers.svg)
@@ -90,8 +92,8 @@ Options:
 
 ## Requirements
 
-- **Python 3.6 or higher**
-- **Inkscape** (for SVG conversion) - must be installed and accessible
+- **Python 3.6 or higher** - tested with `3.12`
+- **Inkscape** (for SVG conversion) - must be installed and accessible. Tested: `v1.4.2`
 - **Ghostscript (gs)** (optional, for validation)
 - No additional Python dependencies (uses only standard library)
 
