@@ -1,141 +1,99 @@
-# EPS to Versaworks Converter
+# SVG/EPS to Roland Versaworks Converter
 
-This program converts Inkscape-exported SVG or EPS files to a Roland Versaworks compatible format. It ensures that cutting operations are properly detected.
+This program converts SVG or EPS files to Roland Versaworks-compatible format with proper CutContour spot color support. It separates cut paths from print content when processing SVG files with designated cut layers.
 
-## The problem
+## Quick Usage
+Name layers with 'cut' in the name
+![Example in inkscape](doc/inkscape_layers.svg)
 
-When exporting EPS files from Inkscape, the software does not export spot colors. However, Roland Versaworks requires cut contour lines to be defined as a specific spot color called "CutContour" with CMYK values of 0,100,0,0 (100% Magenta). Thus, it's impossible to define custom cut operations. 
+Then run the script:
+```bash
+python eps_to_versaworks.py design.svg
+```
+
+This will produce `design_versaworks.eps` with cut paths saved:
+
+![Example output in Versaworks](doc/result_file.png)
+
+### Layer Naming
+
+The cut layer can be named (case-insensitive):
+- `id="cut"` ✓
+- `id="Cut"` ✓
+- `id="CUT"` ✓
+- `id="cut-contour"` ✓
+- `id="cutting-lines"` ✓
+- `inkscape:label="Cut Layer"` ✓
+- `inkscape:label="cut"` ✓
+
+or if manually specified:
+```xml
+<svg>
+  <g id="artwork">
+    <!-- Colors, text, fills - stays as print -->
+  </g>
+  
+  <g id="cut">
+    <!-- Outlines - becomes CutContour -->
+  </g>
+</svg>
+```
+
+## The Problem
+
+When exporting EPS files from Inkscape or other design software, spot colors are not preserved. Roland Versaworks requires cut contour lines to be defined as a specific spot color called "CutContour" with CMYK values of 0,100,0,0 (100% Magenta).
 
 ### Solution
+
 This Python program:
-1. Adds the required spot color definitions to the EPS header
-2. Adds PostScript functions for spot color support
-3. Converts all stroke colors (RGB, CMYK, or grayscale) to the CutContour spot color
-4. Sets stroke width to hairline (0.25 points) as required by Roland specifications
+1. **Detects cut layers** in SVG files (groups/layers with "cut" in their name)
+2. **Separates processing**: Cut layer → CutContour spot color, Print content → preserved as-is
+3. **Adds spot color definitions** to the EPS header using PostScript Level 2 standards
+4. **Applies CutContour** only to designated cut paths
+5. **Merges layers** maintaining perfect alignment
+6. **Validates output** with Ghostscript
+7. **Sets hairline width** (0.25 points) as required by Roland specifications
 
-## Usage
+## Usage documentation
 
-### Basic Usage
+### For SVG with Cut Layer
+
 ```bash
-python epsVersaworksConversion.py input_file.eps [output_file.eps]
+# Without cut layers - Convert everything to cut (ignore layers)
+python eps_to_versaworks.py input.svg --convert-everything-to-cut-path
+
+# SVG with custom output
+python eps_to_versaworks.py input.svg -o output.eps
+
+# EPS input to cut path
+python eps_to_versaworks.py input.eps
+
+# Custom stroke width
+python eps_to_versaworks.py input.svg -w 0.5
 ```
 
-### Examples
-
-Convert a file with automatic output naming:
-```bash
-python epsVersaworksConversion.py mydesign.eps
-# Creates: mydesign_versaworks.eps
+CLI Docs:
 ```
+python eps_to_versaworks.py input.svg [options]
 
-Convert a file with custom output name:
-```bash
-python epsVersaworksConversion.py mydesign.eps mydesign_cutcontour.eps
-```
+Positional arguments:
+  input                 Input SVG or EPS file
 
-Make executable and run directly:
-```bash
-chmod +x epsVersaworksConversion.py
-./epsVersaworksConversion.py mydesign.eps
+Options:
+  -o OUTPUT             Output EPS file (default: input_versaworks.eps)
+  -w STROKE_WIDTH       Stroke width in points (default: 0.25)
+  --convert-everything-to-cut-path
+                        Convert all paths to cut, ignoring layer separation
+  -h, --help           Show help message
+  -v, --version        Show version number
 ```
 
 ## Requirements
 
-- Python 3.6 or higher
-- No additional dependencies required (uses only standard library)
-
-## Technical Details
-
-### CutContour Spot Color Specification
-- **Name**: CutContour
-- **CMYK Values**: 0, 100, 0, 0 (100% Magenta)
-- **Stroke Width**: 0.25 points (hairline)
-
-### What the Program Does
-
-1. **Header Modifications**:
-   - Adds `%%DocumentCustomColors: (CutContour)`
-   - Adds `%%CMYKCustomColor: 0 1.0 0 0 (CutContour)`
-
-2. **PostScript Function Additions**:
-   - Adds `findcmykcustomcolor` function for spot color support
-   - Adds `setcustomcolor` function for applying spot colors
-   - Defines the CutContour spot color variable
-
-3. **Color Conversion**:
-   - Converts RGB colors (e.g., `0.5 0.5 0.5 rg`) to `1.0 CutContour setcustomcolor`
-   - Converts CMYK colors (e.g., `0.5 0.5 0.5 0.5 k`) to `1.0 CutContour setcustomcolor`
-   - Converts grayscale colors (e.g., `0.5 g`) to `1.0 CutContour setcustomcolor`
-
-4. **Stroke Width Adjustment**:
-   - Adds `0.25 w` before stroke commands to set hairline width
-
-## Testing
-
-Run the included test script to verify functionality:
-```bash
-python test_conversion.py
-```
-
-## Compatibility
-
-This program is designed to work with:
-- **Input**: EPS files exported from Inkscape
-- **Output**: EPS files compatible with Roland Versaworks software
-- **Tested with**: Roland Versaworks RIP software
-
-## File Structure
-
-```
-├── epsVersaworksConversion.py    # Main conversion program
-├── test_conversion.py            # Test script
-├── SPEC.md                       # Detailed specification
-├── README.md                     # This documentation
-├── *.eps                         # Sample EPS files
-```
-
-## Example Before/After
-
-### Before (Inkscape Export)
-```postscript
-0.690196 0 0.690196 rg  % RGB color
-1.984252 w              % Line width
-% ... path commands ...
-S                       % Stroke
-```
-
-### After (Versaworks Compatible)
-```postscript
-%%DocumentCustomColors: (CutContour)
-%%CMYKCustomColor: 0 1.0 0 0 (CutContour)
-
-% ... spot color functions ...
-/CutContour 0 1.0 0 0 (CutContour) findcmykcustomcolor def
-
-1.0 CutContour setcustomcolor  % Spot color
-% ... path commands ...
-0.25 w S                       % Hairline stroke
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"File not found" error**: Ensure the input EPS file exists and the path is correct
-2. **Permission denied**: Make sure you have write permissions in the output directory
-3. **No changes visible**: Verify that the original file contains stroke operations
-
-### Verification
-
-To verify the conversion worked:
-1. Check that the output file contains `%%DocumentCustomColors: (CutContour)`
-2. Look for `1.0 CutContour setcustomcolor` in place of original color commands
-3. Confirm stroke commands now include `0.25 w`
-
-## Contributing
-
-This program addresses the specific need of converting Inkscape EPS exports for Roland Versaworks compatibility. If you encounter issues with other EPS sources or need additional features, please review the code and adapt as needed.
+- **Python 3.6 or higher**
+- **Inkscape** (for SVG conversion) - must be installed and accessible
+- **Ghostscript (gs)** (optional, for validation)
+- No additional Python dependencies (uses only standard library)
 
 ## License
-
-This program is provided as-is for educational and practical use in converting EPS files for Roland Versaworks compatibility.
+unilicense.org
