@@ -97,5 +97,11 @@ Options:
 - **Ghostscript (gs)** (optional, for validation)
 - No additional Python dependencies (uses only standard library)
 
+## TODO
++ [ ] Bundle into python package
++ [ ] move tests to pytest: find a way to smoke test the implementation without needing versaworks
++ [ ] To inkscape plugin (optional, still allow CLI)
++ [ ] Build & release with GitHub actions
+
 ## License
 unilicense.org
